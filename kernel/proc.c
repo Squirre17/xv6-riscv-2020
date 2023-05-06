@@ -694,3 +694,34 @@ procdump(void)
     printf("\n");
   }
 }
+
+uint64 va_is_lazypage(uint64 va) {
+
+  struct proc *p = myproc();
+  uint64 sp = p->trapframe->sp;
+
+  uint64 over_upbound = va >= p->sz;
+  uint64 in_guardpage = (va < PGROUNDDOWN(sp) && va >= PGROUNDDOWN(sp) - PGSIZE);
+
+  return (over_upbound || in_guardpage) ? 0 : 1;
+}
+
+void lazypage_alloc(uint64 va) {
+
+  struct proc *p = myproc();
+  char *pa = kalloc();
+  va = PGROUNDDOWN(va);
+
+  if(pa == 0) {
+    // printf("[E] oom occur\n");
+    p->killed = 1;
+    return;
+  };
+  
+  memset(pa, 0, PGSIZE);
+  
+  if(mappages(p->pagetable, va, PGSIZE, (uint64)pa, PTE_W | PTE_X | PTE_R | PTE_U) != 0){
+    kfree(pa);
+    p->killed = 1;
+  }
+}

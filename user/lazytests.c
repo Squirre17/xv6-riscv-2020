@@ -50,7 +50,6 @@ sparse_memory_unmap(char *s)
 
   for (i = prev_end + PGSIZE; i < new_end; i += PGSIZE * PGSIZE)
     *(char **)i = i;
-
   for (i = prev_end + PGSIZE; i < new_end; i += PGSIZE * PGSIZE) {
     pid = fork();
     if (pid < 0) {

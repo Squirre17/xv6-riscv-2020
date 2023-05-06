@@ -41,15 +41,25 @@ sys_wait(void)
 uint64
 sys_sbrk(void)
 {
-  int old_sz;
+  uint64 old_sz;
   int n;
+  struct proc *p = myproc();
 
   if(argint(0, &n) < 0)
     return -1;
-  old_sz = myproc()->sz;
-  // if(growproc(n) < 0)
-  //   return -1;
-  myproc()->sz += n;
+
+  old_sz = p->sz;
+  p->sz += n;
+  if(p->sz <= (PGROUNDDOWN(p->trapframe->sp) - PGSIZE)) {
+    /* overflow : user relase all memory will cause a scause 12 */ 
+    p->sz = old_sz;
+    return -1;
+  }
+
+  if (n < 0) {
+    uvmdealloc(p->pagetable, old_sz, p->sz);
+  }
+
   return old_sz;/* return old size */
 }
 
