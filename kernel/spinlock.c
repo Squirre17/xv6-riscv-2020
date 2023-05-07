@@ -9,7 +9,7 @@
 #include "defs.h"
 
 void
-initlock(struct spinlock *lk, char *name)
+ initlock(struct spinlock *lk, char *name)
 {
   lk->name = name;
   lk->locked = 0;

@@ -29,6 +29,10 @@ trapinithart(void)
   w_stvec((uint64)kernelvec);
 }
 
+#define SCAUSE
+#define LOAD_PAGE_FAULT 13
+#define STORE_PAGE_FAULT 15
+
 //
 // handle an interrupt, exception, or system call from user space.
 // called from trampoline.S
@@ -65,7 +69,23 @@ usertrap(void)
     intr_on();
 
     syscall();
-  } else if((which_dev = devintr()) != 0){
+  } else if(r_scause() == SCAUSE STORE_PAGE_FAULT) {// || r_scause() == SCAUSE LOAD_PAGE_FAULT) { /* write to page */
+
+    uint64 va = r_stval();
+
+    if(is_cow_page(p->pagetable, va)) {
+      if(cow_assign(p->pagetable, va) < 0) {
+        p->killed = 1;
+      }
+      // printf("[+] cow_assign over\n");
+    }else {
+      printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+      printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+      p->killed = 1;
+    }
+
+  }
+  else if((which_dev = devintr()) != 0){
     // ok
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
