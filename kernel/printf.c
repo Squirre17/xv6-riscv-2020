@@ -59,6 +59,43 @@ printptr(uint64 x)
     consputc(digits[x >> (sizeof(uint64) * 8 - 4)]);
 }
 
+/// @brief colorful print
+/// @param fmt 
+/// @param  
+void cprint(char *fmt, ...) {
+
+  if(myproc()->pid % 2 == 0) {
+
+    printf("\x1b[93m");
+
+  }else {
+    
+    printf("\x1b[96m");
+    
+  }
+
+  // va_list args;
+
+  // va_start(args, fmt);
+  printf(fmt);
+  // va_end(args);
+
+  printf("\x1b[0m");
+}
+
+void schedule_cprint(char *fmt, ...) {
+
+  printf("\x1b[91m");
+
+  // va_list args;
+
+  // va_start(args, fmt);
+  printf(fmt);
+  // va_end(args);
+
+  printf("\x1b[0m");
+}
+
 // Print to the console. only understands %d, %x, %p, %s.
 void
 printf(char *fmt, ...)

@@ -83,6 +83,8 @@ int             pipewrite(struct pipe*, uint64, int);
 void            printf(char*, ...);
 void            panic(char*) __attribute__((noreturn));
 void            printfinit(void);
+void            cprint(char *fmt, ...);
+void            schedule_cprint(char *fmt, ...);
 
 // proc.c
 int             cpuid(void);
