@@ -29,7 +29,18 @@ barrier()
   //
   // Block until all threads have called barrier() and
   // then increment bstate.round.
-  //
+  // (+)
+  pthread_mutex_lock(&bstate.barrier_mutex);
+
+  if(++bstate.nthread < nthread) {
+    pthread_cond_wait(&bstate.barrier_cond, &bstate.barrier_mutex);// unlock until signal arrive and lock again
+  }else {/* last arrived thread */
+    bstate.nthread = 0;// 每轮到达的线程 一轮结束要清零
+    bstate.round++;    // nthread个线程到达就算一轮
+    pthread_cond_broadcast(&bstate.barrier_cond);
+  }
+
+  pthread_mutex_unlock(&bstate.barrier_mutex);
   
 }
 
