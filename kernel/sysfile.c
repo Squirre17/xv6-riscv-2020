@@ -330,6 +330,51 @@ sys_open(void)
     return -1;
   }
 
+  if(!(omode & O_NOFOLLOW)) {
+
+    uint cnt = 0;
+    
+    while(ip->type == T_SYMLINK && cnt < 10) {/* 最多符号链接十次 */
+    
+      int len = 0;
+      readi(ip, 0, (uint64)&len, 0, sizeof(int));
+      
+      if(len > MAXPATH)
+        panic("open: corrupted symlink inode");
+      
+      readi(ip, 0, (uint64)path, sizeof(int), len + 1);
+      iunlockput(ip);
+
+      if((ip = namei(path)) == 0){ /* 通过名字返回inode */
+        end_op();
+        return -1;
+      }
+
+      ilock(ip);
+      
+      if(ip->type == T_DIR && omode != O_RDONLY){
+        iunlockput(ip);
+        end_op();
+        return -1;
+      }
+
+      if(ip->type == T_DEVICE && (ip->major < 0 || ip->major >= NDEV)){
+        iunlockput(ip);
+        end_op();
+        return -1;
+      }
+
+      cnt++;
+    }
+
+    if(cnt >= 10) {
+      iunlockput(ip);
+      end_op();
+      return -1;
+    }
+  }
+
+
   if(ip->type == T_DEVICE){
     f->type = FD_DEVICE;
     f->major = ip->major;
@@ -482,5 +527,30 @@ sys_pipe(void)
     fileclose(wf);
     return -1;
   }
+  return 0;
+}
+
+uint64 sys_symlink(void)
+{ 
+  char target[MAXPATH], path[MAXPATH];
+  struct inode *ip;
+
+  if (argstr(0, target, MAXPATH) < 0 || argstr(1, path, MAXPATH) < 0)
+    return -1;
+
+  begin_op();
+  if((ip =  create(path, T_SYMLINK, 0, 0)) == 0){
+    end_op();
+    return -1;
+  }
+
+  int len = strlen(target);
+
+  // 先写入4字节的长度 再写入字符串 symlink的块中是这样存储的
+  writei(ip, 0, (uint64)&len, 0, sizeof(len));
+  writei(ip, 0, (uint64)target, sizeof(len), len+1);
+
+  iunlockput(ip);
+  end_op();
   return 0;
 }
