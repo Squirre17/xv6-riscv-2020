@@ -255,7 +255,7 @@ balloc(int used)
     buf[i/8] = buf[i/8] | (0x1 << (i%8));
   }
   printf("balloc: write bitmap block at sector %d\n", sb.bmapstart);
-  wsect(sb.bmapstart, buf);
+  wsect(sb.bmapstart, buf);// (+) write bitmap to disk
 }
 
 #define min(a, b) ((a) < (b) ? (a) : (b))

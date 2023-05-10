@@ -34,7 +34,7 @@
 // and to keep track in memory of logged block# before commit.
 struct logheader {
   int n;
-  int block[LOGSIZE];
+  int block[LOGSIZE];// (+) 每一块block的设备号
 };
 
 struct log {
@@ -58,7 +58,7 @@ initlog(int dev, struct superblock *sb)
     panic("initlog: too big logheader");
 
   initlock(&log.lock, "log");
-  log.start = sb->logstart;
+  log.start = sb->logstart;// (+) block number
   log.size = sb->nlog;
   log.dev = dev;
   recover_from_log();
@@ -103,13 +103,13 @@ static void
 write_head(void)
 {
   struct buf *buf = bread(log.dev, log.start);
-  struct logheader *hb = (struct logheader *) (buf->data);
+  struct logheader *hb = (struct logheader *) (buf->data);// (+) 将一个block的数据解释为logheader 说明matedata中就包含n?
   int i;
   hb->n = log.lh.n;
   for (i = 0; i < log.lh.n; i++) {
-    hb->block[i] = log.lh.block[i];
+    hb->block[i] = log.lh.block[i];// (+) 内存中的logheader写入logblock的缓冲区
   }
-  bwrite(buf);
+  bwrite(buf);// (+) write buf->data to disk
   brelse(buf);
 }
 
@@ -180,10 +180,10 @@ write_log(void)
 {
   int tail;
 
-  for (tail = 0; tail < log.lh.n; tail++) {
+  for (tail = 0; tail < log.lh.n; tail++) {// (+) 遍历需要写的所有blockno
     struct buf *to = bread(log.dev, log.start+tail+1); // log block
     struct buf *from = bread(log.dev, log.lh.block[tail]); // cache block
-    memmove(to->data, from->data, BSIZE);
+    memmove(to->data, from->data, BSIZE);// (+) 写入log的缓存中去
     bwrite(to);  // write the log
     brelse(from);
     brelse(to);
@@ -226,7 +226,7 @@ log_write(struct buf *b)
     if (log.lh.block[i] == b->blockno)   // log absorbtion
       break;
   }
-  log.lh.block[i] = b->blockno;
+  log.lh.block[i] = b->blockno; // (+) 前面的n个block都匹配不到 就用block[n] 记录当前的blockno
   if (i == log.lh.n) {  // Add new block to log?
     bpin(b);
     log.lh.n++;

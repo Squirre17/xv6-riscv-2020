@@ -69,8 +69,8 @@ balloc(uint dev)
 
   bp = 0;
   for(b = 0; b < sb.size; b += BPB){
-    bp = bread(dev, BBLOCK(b, sb));
-    for(bi = 0; bi < BPB && b + bi < sb.size; bi++){
+    bp = bread(dev, BBLOCK(b, sb));// (+) 从bitmap开始向后迭代 一次加一块
+    for(bi = 0; bi < BPB && b + bi < sb.size; bi++){// (+) 在这一块中 对每个bit遍历
       m = 1 << (bi % 8);
       if((bp->data[bi/8] & m) == 0){  // Is block free?
         bp->data[bi/8] |= m;  // Mark block in use.
@@ -199,9 +199,9 @@ ialloc(uint dev, short type)
   struct buf *bp;
   struct dinode *dip;
 
-  for(inum = 1; inum < sb.ninodes; inum++){
+  for(inum = 1; inum < sb.ninodes; inum++){// (+) 遍历inode数量
     bp = bread(dev, IBLOCK(inum, sb));
-    dip = (struct dinode*)bp->data + inum%IPB;
+    dip = (struct dinode*)bp->data + inum%IPB;// IPB是一个block最多有几个dinode
     if(dip->type == 0){  // a free inode
       memset(dip, 0, sizeof(*dip));
       dip->type = type;
@@ -377,8 +377,8 @@ iunlockput(struct inode *ip)
 static uint
 bmap(struct inode *ip, uint bn)
 {
-  uint addr, *a;
-  struct buf *bp;
+  uint addr, *a, *a2;
+  struct buf *bp, *bp2;
 
   if(bn < NDIRECT){
     if((addr = ip->addrs[bn]) == 0)
@@ -387,7 +387,7 @@ bmap(struct inode *ip, uint bn)
   }
   bn -= NDIRECT;
 
-  if(bn < NINDIRECT){
+  if(bn < NINDIRECT){/* sacrifice a direct block for one layer indirect block */
     // Load indirect block, allocating if necessary.
     if((addr = ip->addrs[NDIRECT]) == 0)
       ip->addrs[NDIRECT] = addr = balloc(ip->dev);
@@ -399,6 +399,35 @@ bmap(struct inode *ip, uint bn)
     }
     brelse(bp);
     return addr;
+  }
+  bn -= NINDIRECT;
+
+  if(bn < NINDIRECT2) {
+    uint bn_level1 = bn / NINDIRECT;
+    uint bn_level2 = bn % NINDIRECT;
+
+    if((addr = ip->addrs[NDIRECT + 1]) == 0)/* get a addrs correspond to 2nd indirect block */
+      ip->addrs[NDIRECT + 1] = addr = balloc(ip->dev);
+      
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+
+    if((addr = a[bn_level1]) == 0){
+      a[bn_level1] = addr = balloc(ip->dev);
+      log_write(bp);
+    }
+    brelse(bp);
+
+    bp2 = bread(ip->dev, addr);
+    a2 = (uint*)bp2->data;
+
+    if((addr = a2[bn_level2]) == 0){
+      a2[bn_level2] = addr = balloc(ip->dev);
+      log_write(bp2);
+    }
+    brelse(bp2);
+    return addr;
+    
   }
 
   panic("bmap: out of range");
